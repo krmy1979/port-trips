@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ← החלף בכתובת ה-Gmail של המנהל (העותק הפעיל נמצא ב-Firebase Console)
+    function isManager() {
+      return request.auth != null
+        && request.auth.token.email in ['MANAGER_EMAIL@gmail.com'];
+    }
+    function signedIn() { return request.auth != null; }
+
+    // הגדרות: כולם קוראים, רק מנהל כותב
+    match /config/{doc} {
+      allow read: if signedIn();
+      allow write: if isManager();
+    }
+
+    // כל נהג כותב רק את הרשומה שלו. מנהל רואה את כולם.
+    match /drivers/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isManager());
+      allow write: if signedIn() && request.auth.uid == uid;
+
+      match /trips/{tripId} {
+        allow read: if signedIn() && (request.auth.uid == uid || isManager());
+        allow create: if signedIn() && request.auth.uid == uid;
+        allow update, delete: if isManager();   // נהג לא יכול למחוק או לשנות נגלה
+      }
+    }
+  }
+}
